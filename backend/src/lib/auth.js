@@ -78,6 +78,15 @@ var builtInRoles = {
     },
     admin: {
         allows: "*"
+    },
+    "Engagement Oversight": {
+        allows: "*"
+    },
+    "Lead Penetration Tester": {
+        allows: "*"
+    },
+    "Penetration Tester": {
+        allows: "*"
     }
 }
 
