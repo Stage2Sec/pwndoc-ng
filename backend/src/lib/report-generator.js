@@ -1,3 +1,7 @@
+const writeXlsxFile = require("write-excel-file/node");
+const os = require("os");
+const path = require("path");
+
 var fs = require('fs');
 var Docxtemplater = require('docxtemplater');
 var PizZip = require("pizzip");
@@ -80,9 +84,89 @@ async function generateDoc(audit) {
     catch(err) {
         console.log(err)
     }
+
+    const chartXMLPath = "word/charts/chart1.xml"
+    if (zip.file(chartXMLPath)) {
+        // lets update the data in chart1
+        // this will update the chart in the generated document
+        // however, when updating the chart with excel from word, the data is wrong
+        zip.file(chartXMLPath, getChartXML(preppedAudit))
+
+        // we need to generate a new xlsx file? to make the edit data in excel have accurate data
+        // let newXlsxFile = getChartTmpXLSXFile()
+        const chartXLSXsummaryData = [
+            [
+                {
+                    value: 'Severity',
+                    fontWeight: 'bold'
+                },
+                {
+                    value: 'Count',
+                    fontWeight: 'bold'
+                }
+            ],
+            [
+                {
+                    value: "Info",
+                    type: String
+                },
+                {
+                    value: preppedAudit.findingsSeveritySummary.None,
+                    type: Number
+                }
+            ],
+            [
+                {
+                    value: "Low",
+                    type: String
+                },
+                {
+                    value: preppedAudit.findingsSeveritySummary.Low,
+                    type: Number
+                }
+            ],
+            [
+                {
+                    value: "Medium",
+                    type: String
+                },
+                {
+                    value: preppedAudit.findingsSeveritySummary.Medium,
+                    type: Number
+                }
+            ],
+            [
+                {
+                    value: "High",
+                    type: String
+                },
+                {
+                    value: preppedAudit.findingsSeveritySummary.High,
+                    type: Number
+                }
+            ],
+            [
+                {
+                    value: "Critical",
+                    type: String
+                },
+                {
+                    value: preppedAudit.findingsSeveritySummary.Critical,
+                    type: Number
+                }
+            ],
+        ]
+        const xlsxContent = await writeXlsxFile(chartXLSXsummaryData, {
+            buffer: true
+        })
+        zip.file("word/embeddings/Microsoft_Excel_Worksheet.xlsx", xlsxContent, {binary:true})
+    }
+
     var doc = new Docxtemplater().attachModule(imageModule).loadZip(zip).setOptions({parser: parser, paragraphLoop: true});
     customGenerator.apply(preppedAudit);
     doc.setData(preppedAudit);
+
+
     try {
         doc.render();
     }
@@ -106,6 +190,7 @@ async function generateDoc(audit) {
             throw error
         }
     }
+
     var buf = doc.getZip().generate({type:"nodebuffer"});
 
     return buf;
@@ -807,7 +892,13 @@ async function prepAuditData(data, settings) {
 
     result.language = data.language || "undefined"
     result.scope = data.scope.toObject() || []
-
+    result.findingsSeveritySummary = {
+        None: 0,
+        Low: 0,
+        Medium: 0,
+        High: 0,
+        Critical: 0,
+    }
     result.findings = []
     for (finding of data.findings) {
         var tmpCVSS = CVSS31.calculateCVSSFromVector(finding.cvssv3);
@@ -906,6 +997,7 @@ async function prepAuditData(data, settings) {
             }
         }
         result.findings.push(tmpFinding)
+        result.findingsSeveritySummary[tmpCVSS.baseSeverity || "None"]++
     }
 
     result.categories = _
@@ -992,4 +1084,423 @@ function replaceSubTemplating(o, originalData = o){
             else replaceSubTemplating(o[key], originalData)
         })
     }
+}
+
+
+function getChartTmpXLSXFile () {
+    const fileName = `tmp-pwndoc-chart-xml-${Date.now()}.xlsx`
+    return path.join(os.tmpdir(), fileName)
+}
+
+function getChartXML(preppedAudit) {
+// lets update the data in chart1
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:c16r2="http://schemas.microsoft.com/office/drawing/2015/06/chart">
+  <c:date1904 val="0"/>
+  <c:lang val="en-US"/>
+  <c:roundedCorners val="0"/>
+  <mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+    <mc:Choice Requires="c14" xmlns:c14="http://schemas.microsoft.com/office/drawing/2007/8/2/chart">
+      <c14:style val="102"/>
+    </mc:Choice>
+    <mc:Fallback>
+      <c:style val="2"/>
+    </mc:Fallback>
+  </mc:AlternateContent>
+  <c:chart>
+    <c:title>
+      <c:tx>
+        <c:rich>
+          <a:bodyPr rot="0" spcFirstLastPara="1" vertOverflow="ellipsis" vert="horz" wrap="square" anchor="ctr" anchorCtr="1"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:defRPr sz="1400" b="0" i="0" u="none" strike="noStrike" kern="1200" spc="0" baseline="0">
+                <a:solidFill>
+                  <a:schemeClr val="tx1">
+                    <a:lumMod val="65000"/>
+                    <a:lumOff val="35000"/>
+                  </a:schemeClr>
+                </a:solidFill>
+                <a:latin typeface="+mn-lt"/>
+                <a:ea typeface="+mn-ea"/>
+                <a:cs typeface="+mn-cs"/>
+              </a:defRPr>
+            </a:pPr>
+            <a:r>
+              <a:rPr lang="en-US">
+                <a:solidFill>
+                  <a:schemeClr val="tx1"/>
+                </a:solidFill>
+                <a:latin typeface="IBM Plex Sans" panose="020B0503050203000203" pitchFamily="34" charset="77"/>
+              </a:rPr>
+              <a:t>Findings by Severity Level</a:t>
+            </a:r>
+          </a:p>
+        </c:rich>
+      </c:tx>
+      <c:overlay val="0"/>
+      <c:spPr>
+        <a:noFill/>
+        <a:ln>
+          <a:noFill/>
+        </a:ln>
+        <a:effectLst/>
+      </c:spPr>
+      <c:txPr>
+        <a:bodyPr rot="0" spcFirstLastPara="1" vertOverflow="ellipsis" vert="horz" wrap="square" anchor="ctr" anchorCtr="1"/>
+        <a:lstStyle/>
+        <a:p>
+          <a:pPr>
+            <a:defRPr sz="1400" b="0" i="0" u="none" strike="noStrike" kern="1200" spc="0" baseline="0">
+              <a:solidFill>
+                <a:schemeClr val="tx1">
+                  <a:lumMod val="65000"/>
+                  <a:lumOff val="35000"/>
+                </a:schemeClr>
+              </a:solidFill>
+              <a:latin typeface="+mn-lt"/>
+              <a:ea typeface="+mn-ea"/>
+              <a:cs typeface="+mn-cs"/>
+            </a:defRPr>
+          </a:pPr>
+          <a:endParaRPr lang="en-US"/>
+        </a:p>
+      </c:txPr>
+    </c:title>
+    <c:autoTitleDeleted val="0"/>
+    <c:plotArea>
+      <c:layout/>
+      <c:barChart>
+        <c:barDir val="col"/>
+        <c:grouping val="clustered"/>
+        <c:varyColors val="0"/>
+        <c:ser>
+          <c:idx val="0"/>
+          <c:order val="0"/>
+          <c:tx>
+            <c:strRef>
+              <c:f>Sheet1!$B$1</c:f>
+              <c:strCache>
+                <c:ptCount val="1"/>
+                <c:pt idx="0">
+                  <c:v>Count</c:v>
+                </c:pt>
+              </c:strCache>
+            </c:strRef>
+          </c:tx>
+          <c:spPr>
+            <a:solidFill>
+              <a:schemeClr val="accent2"/>
+            </a:solidFill>
+            <a:ln>
+              <a:noFill/>
+            </a:ln>
+            <a:effectLst/>
+          </c:spPr>
+          <c:invertIfNegative val="0"/>
+          <c:dPt>
+            <c:idx val="0"/>
+            <c:invertIfNegative val="0"/>
+            <c:bubble3D val="0"/>
+            <c:spPr>
+              <a:solidFill>
+                <a:schemeClr val="accent4">
+                  <a:lumMod val="75000"/>
+                </a:schemeClr>
+              </a:solidFill>
+              <a:ln>
+                <a:noFill/>
+              </a:ln>
+              <a:effectLst/>
+            </c:spPr>
+            <c:extLst>
+              <c:ext uri="{C3380CC4-5D6E-409C-BE32-E72D297353CC}" xmlns:c16="http://schemas.microsoft.com/office/drawing/2014/chart">
+                <c16:uniqueId val="{00000001-20E2-414A-AAA3-32A48BFBEEC3}"/>
+              </c:ext>
+            </c:extLst>
+          </c:dPt>
+          <c:dPt>
+            <c:idx val="1"/>
+            <c:invertIfNegative val="0"/>
+            <c:bubble3D val="0"/>
+            <c:spPr>
+              <a:solidFill>
+                <a:srgbClr val="DFEB07"/>
+              </a:solidFill>
+              <a:ln>
+                <a:noFill/>
+              </a:ln>
+              <a:effectLst/>
+            </c:spPr>
+            <c:extLst>
+              <c:ext uri="{C3380CC4-5D6E-409C-BE32-E72D297353CC}" xmlns:c16="http://schemas.microsoft.com/office/drawing/2014/chart">
+                <c16:uniqueId val="{00000003-20E2-414A-AAA3-32A48BFBEEC3}"/>
+              </c:ext>
+            </c:extLst>
+          </c:dPt>
+          <c:dPt>
+            <c:idx val="2"/>
+            <c:invertIfNegative val="0"/>
+            <c:bubble3D val="0"/>
+            <c:spPr>
+              <a:solidFill>
+                <a:srgbClr val="F7A00A"/>
+              </a:solidFill>
+              <a:ln>
+                <a:noFill/>
+              </a:ln>
+              <a:effectLst/>
+            </c:spPr>
+            <c:extLst>
+              <c:ext uri="{C3380CC4-5D6E-409C-BE32-E72D297353CC}" xmlns:c16="http://schemas.microsoft.com/office/drawing/2014/chart">
+                <c16:uniqueId val="{00000005-20E2-414A-AAA3-32A48BFBEEC3}"/>
+              </c:ext>
+            </c:extLst>
+          </c:dPt>
+          <c:dPt>
+            <c:idx val="3"/>
+            <c:invertIfNegative val="0"/>
+            <c:bubble3D val="0"/>
+            <c:spPr>
+              <a:solidFill>
+                <a:srgbClr val="FF0000"/>
+              </a:solidFill>
+              <a:ln>
+                <a:noFill/>
+              </a:ln>
+              <a:effectLst/>
+            </c:spPr>
+            <c:extLst>
+              <c:ext uri="{C3380CC4-5D6E-409C-BE32-E72D297353CC}" xmlns:c16="http://schemas.microsoft.com/office/drawing/2014/chart">
+                <c16:uniqueId val="{00000007-20E2-414A-AAA3-32A48BFBEEC3}"/>
+              </c:ext>
+            </c:extLst>
+          </c:dPt>
+          <c:dPt>
+            <c:idx val="4"/>
+            <c:invertIfNegative val="0"/>
+            <c:bubble3D val="0"/>
+            <c:spPr>
+              <a:solidFill>
+                <a:srgbClr val="AB0000"/>
+              </a:solidFill>
+              <a:ln>
+                <a:noFill/>
+              </a:ln>
+              <a:effectLst/>
+            </c:spPr>
+            <c:extLst>
+              <c:ext uri="{C3380CC4-5D6E-409C-BE32-E72D297353CC}" xmlns:c16="http://schemas.microsoft.com/office/drawing/2014/chart">
+                <c16:uniqueId val="{00000009-20E2-414A-AAA3-32A48BFBEEC3}"/>
+              </c:ext>
+            </c:extLst>
+          </c:dPt>
+          <c:cat>
+            <c:strRef>
+              <c:f>Sheet1!$A$2:$A$6</c:f>
+              <c:strCache>
+                <c:ptCount val="5"/>
+                <c:pt idx="0">
+                  <c:v>Info</c:v>
+                </c:pt>
+                <c:pt idx="1">
+                  <c:v>Low</c:v>
+                </c:pt>
+                <c:pt idx="2">
+                  <c:v>Medium</c:v>
+                </c:pt>
+                <c:pt idx="3">
+                  <c:v>High</c:v>
+                </c:pt>
+                <c:pt idx="4">
+                  <c:v>Critical</c:v>
+                </c:pt>
+              </c:strCache>
+            </c:strRef>
+          </c:cat>
+          <c:val>
+            <c:numRef>
+              <c:f>Sheet1!$B$2:$B$6</c:f>
+              <c:numCache>
+                <c:formatCode>General</c:formatCode>
+                <c:ptCount val="5"/>
+                <c:pt idx="0">
+                  <c:v>${preppedAudit.findingsSeveritySummary.None}</c:v>
+                </c:pt>
+                <c:pt idx="1">
+                  <c:v>${preppedAudit.findingsSeveritySummary.Low}</c:v>
+                </c:pt>
+                <c:pt idx="2">
+                  <c:v>${preppedAudit.findingsSeveritySummary.Medium}</c:v>
+                </c:pt>
+                <c:pt idx="3">
+                  <c:v>${preppedAudit.findingsSeveritySummary.High}</c:v>
+                </c:pt>
+                <c:pt idx="4">
+                  <c:v>${preppedAudit.findingsSeveritySummary.Critical}</c:v>
+                </c:pt>
+              </c:numCache>
+            </c:numRef>
+          </c:val>
+          <c:extLst>
+            <c:ext uri="{C3380CC4-5D6E-409C-BE32-E72D297353CC}" xmlns:c16="http://schemas.microsoft.com/office/drawing/2014/chart">
+              <c16:uniqueId val="{0000000A-20E2-414A-AAA3-32A48BFBEEC3}"/>
+            </c:ext>
+          </c:extLst>
+        </c:ser>
+        <c:dLbls>
+          <c:showLegendKey val="0"/>
+          <c:showVal val="0"/>
+          <c:showCatName val="0"/>
+          <c:showSerName val="0"/>
+          <c:showPercent val="0"/>
+          <c:showBubbleSize val="0"/>
+        </c:dLbls>
+        <c:gapWidth val="219"/>
+        <c:overlap val="-27"/>
+        <c:axId val="1285494799"/>
+        <c:axId val="1210782351"/>
+      </c:barChart>
+      <c:catAx>
+        <c:axId val="1285494799"/>
+        <c:scaling>
+          <c:orientation val="minMax"/>
+        </c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="b"/>
+        <c:numFmt formatCode="General" sourceLinked="1"/>
+        <c:majorTickMark val="none"/>
+        <c:minorTickMark val="none"/>
+        <c:tickLblPos val="nextTo"/>
+        <c:spPr>
+          <a:noFill/>
+          <a:ln w="9525" cap="flat" cmpd="sng" algn="ctr">
+            <a:solidFill>
+              <a:schemeClr val="accent6"/>
+            </a:solidFill>
+            <a:round/>
+          </a:ln>
+          <a:effectLst/>
+        </c:spPr>
+        <c:txPr>
+          <a:bodyPr rot="-60000000" spcFirstLastPara="1" vertOverflow="ellipsis" vert="horz" wrap="square" anchor="ctr" anchorCtr="1"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:defRPr sz="900" b="0" i="0" u="none" strike="noStrike" kern="1200" baseline="0">
+                <a:solidFill>
+                  <a:schemeClr val="tx1"/>
+                </a:solidFill>
+                <a:latin typeface="IBM Plex Sans" panose="020B0503050203000203" pitchFamily="34" charset="77"/>
+                <a:ea typeface="+mn-ea"/>
+                <a:cs typeface="+mn-cs"/>
+              </a:defRPr>
+            </a:pPr>
+            <a:endParaRPr lang="en-US"/>
+          </a:p>
+        </c:txPr>
+        <c:crossAx val="1210782351"/>
+        <c:crosses val="autoZero"/>
+        <c:auto val="1"/>
+        <c:lblAlgn val="ctr"/>
+        <c:lblOffset val="100"/>
+        <c:noMultiLvlLbl val="0"/>
+      </c:catAx>
+      <c:valAx>
+        <c:axId val="1210782351"/>
+        <c:scaling>
+          <c:orientation val="minMax"/>
+          <c:min val="0"/>
+        </c:scaling>
+        <c:delete val="0"/>
+        <c:axPos val="l"/>
+        <c:majorGridlines>
+          <c:spPr>
+            <a:ln w="9525" cap="flat" cmpd="sng" algn="ctr">
+              <a:solidFill>
+                <a:schemeClr val="accent6"/>
+              </a:solidFill>
+              <a:round/>
+            </a:ln>
+            <a:effectLst/>
+          </c:spPr>
+        </c:majorGridlines>
+        <c:numFmt formatCode="General" sourceLinked="1"/>
+        <c:majorTickMark val="none"/>
+        <c:minorTickMark val="none"/>
+        <c:tickLblPos val="nextTo"/>
+        <c:spPr>
+          <a:noFill/>
+          <a:ln>
+            <a:noFill/>
+          </a:ln>
+          <a:effectLst/>
+        </c:spPr>
+        <c:txPr>
+          <a:bodyPr rot="-60000000" spcFirstLastPara="1" vertOverflow="ellipsis" vert="horz" wrap="square" anchor="ctr" anchorCtr="1"/>
+          <a:lstStyle/>
+          <a:p>
+            <a:pPr>
+              <a:defRPr sz="900" b="0" i="0" u="none" strike="noStrike" kern="1200" baseline="0">
+                <a:solidFill>
+                  <a:schemeClr val="tx1"/>
+                </a:solidFill>
+                <a:latin typeface="IBM Plex Sans" panose="020B0503050203000203" pitchFamily="34" charset="77"/>
+                <a:ea typeface="+mn-ea"/>
+                <a:cs typeface="+mn-cs"/>
+              </a:defRPr>
+            </a:pPr>
+            <a:endParaRPr lang="en-US"/>
+          </a:p>
+        </c:txPr>
+        <c:crossAx val="1285494799"/>
+        <c:crosses val="autoZero"/>
+        <c:crossBetween val="between"/>
+        <c:majorUnit val="1"/>
+        <c:minorUnit val="1"/>
+      </c:valAx>
+      <c:spPr>
+        <a:noFill/>
+        <a:ln>
+          <a:noFill/>
+        </a:ln>
+        <a:effectLst/>
+      </c:spPr>
+    </c:plotArea>
+    <c:plotVisOnly val="1"/>
+    <c:dispBlanksAs val="gap"/>
+    <c:extLst>
+      <c:ext uri="{56B9EC1D-385E-4148-901F-78D8002777C0}" xmlns:c16r3="http://schemas.microsoft.com/office/drawing/2017/03/chart">
+        <c16r3:dataDisplayOptions16>
+          <c16r3:dispNaAsBlank val="1"/>
+        </c16r3:dataDisplayOptions16>
+      </c:ext>
+    </c:extLst>
+    <c:showDLblsOverMax val="0"/>
+  </c:chart>
+  <c:spPr>
+    <a:solidFill>
+      <a:schemeClr val="bg1"/>
+    </a:solidFill>
+    <a:ln w="28575" cap="flat" cmpd="sng" algn="ctr">
+      <a:noFill/>
+      <a:round/>
+    </a:ln>
+    <a:effectLst/>
+  </c:spPr>
+  <c:txPr>
+    <a:bodyPr/>
+    <a:lstStyle/>
+    <a:p>
+      <a:pPr>
+        <a:defRPr/>
+      </a:pPr>
+      <a:endParaRPr lang="en-US"/>
+    </a:p>
+  </c:txPr>
+  <c:externalData r:id="rId3">
+    <c:autoUpdate val="0"/>
+  </c:externalData>
+</c:chartSpace>`
 }
