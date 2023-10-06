@@ -65,7 +65,10 @@ export default {
     return Vue.prototype.$axios.get(`audits/types`)
   },
 
-  generateAuditReport: function(auditId) {
+  generateAuditReport: function(auditId, templateID) {
+    if (templateID) {
+      return Vue.prototype.$axios.get(`audits/${auditId}/generate?templateId=${templateID}`, {responseType: 'blob'})
+    }
     return Vue.prototype.$axios.get(`audits/${auditId}/generate`, {responseType: 'blob'})
   },
 

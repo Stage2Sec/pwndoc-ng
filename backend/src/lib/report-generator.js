@@ -19,8 +19,11 @@ var translate = require('../translate')
 var $t
 
 // Generate document with docxtemplater
-async function generateDoc(audit) {
+async function generateDoc(audit, template) {
     var templatePath = `${__basedir}/../report-templates/${audit.template.name}.${audit.template.ext || 'docx'}`
+    if (template) {
+        templatePath = `${__basedir}/../report-templates/${template.name}.${template.ext || 'docx'}`
+    }
     var content = fs.readFileSync(templatePath, "binary");
 
     var zip = new PizZip(content);

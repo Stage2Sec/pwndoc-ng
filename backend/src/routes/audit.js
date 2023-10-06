@@ -7,6 +7,7 @@ module.exports = function(app, io) {
     var _ = require('lodash');
     var utils = require('../lib/utils');
     var Settings = require('mongoose').model('Settings');
+    const {getOne} = require("../models/template");
 
     /* ### AUDITS LIST ### */
 
@@ -411,11 +412,22 @@ module.exports = function(app, io) {
                 return;
             }
 
-            if (!audit.template)
+            let template, reportName
+            if (req.query.templateId) {
+                template = (await getOne(req.query.templateId))
+                if (template) {
+                    console.log(template)
+                    reportName = `${audit.name.replace(/[\\\/:*?"<>|]/g, "")} ${template.name.replace(/[\\\/:*?"<>|]/g, "")}.${template.ext || 'docx'}`
+                }
+            } else {
+                reportName = `${audit.name.replace(/[\\\/:*?"<>|]/g, "")}.${audit.template.ext || 'docx'}`
+            }
+
+            if (!audit.template && !template)
                 throw ({fn: 'BadParameters', message: 'Template not defined'})
 
-            var reportDoc = await reportGenerator.generateDoc(audit);
-            Response.SendFile(res, `${audit.name.replace(/[\\\/:*?"<>|]/g, "")}.${audit.template.ext || 'docx'}`, reportDoc);
+            var reportDoc = await reportGenerator.generateDoc(audit, template);
+            Response.SendFile(res, reportName, reportDoc);
         })
         .catch(err => {
             if (err.code === "ENOENT")
