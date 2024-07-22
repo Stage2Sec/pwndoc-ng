@@ -358,6 +358,48 @@ module.exports = function(app, io) {
         .catch(err => Response.Internal(res, err))
     });
 
+    // Create section of audit
+    app.post("/api/audits/:auditId/sections/", acl.hasPermission('audits:update'), async function(req, res) {
+        // #swagger.tags = ['Audit']
+
+        var settings = await Settings.getAll();
+        var audit = await Audit.getAudit(acl.isAllowed(req.decodedToken.role, 'audits:read-all'), req.params.auditId, req.decodedToken.id);
+        if (settings.reviews.enabled && audit.state !== "EDIT") {
+            Response.Forbidden(res, "The audit is not in the EDIT state and therefore cannot be edited.");
+            return;
+        }
+        if (typeof req.body.customFields === 'undefined') {
+            Response.BadParameters(res, 'Missing some required parameters: customFields');
+            return;
+        }
+        if (typeof req.body.field === 'undefined' || req.body.field === "" ) {
+            Response.BadParameters(res, 'Missing some required parameters: field');
+            return;
+        }
+        if (typeof req.body.name === 'undefined' || req.body.name === "") {
+            Response.BadParameters(res, 'Missing some required parameters: name');
+            return;
+        }
+        var section = {};
+        // Mandatory parameters
+        section.customFields = req.body.customFields;
+        section.field = req.body.field;
+        section.name = req.body.name;
+
+        // For retrocompatibility with old section.text usage
+        if (req.body.text) section.text = req.body.text;
+
+        if (settings.reviews.enabled && settings.reviews.private.removeApprovalsUponUpdate) {
+            Audit.updateGeneral(acl.isAllowed(req.decodedToken.role, 'audits:update-all'), req.params.auditId, req.decodedToken.id, { approvals: [] });
+        }
+
+        Audit.createSection(acl.isAllowed(req.decodedToken.role, 'audits:update-all'), req.params.auditId, req.decodedToken.id, section)
+            .then(msg => {
+                Response.Ok(res, msg)
+            })
+            .catch(err => Response.Internal(res, err))
+    });
+
     // Get section of audit
     app.get("/api/audits/:auditId/sections/:sectionId", acl.hasPermission('audits:read'), function(req, res) {
         // #swagger.tags = ['Audit']
